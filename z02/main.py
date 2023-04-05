@@ -1,7 +1,7 @@
 import sys
 
-import pandas
 import numpy as np
+import pandas
 
 
 def load_file(file_path):
@@ -36,7 +36,7 @@ def kernel(distance, lamda):
     return (3 / (4 * lamda)) * (1 - ((distance / lamda) ** 2))
 
 
-def knn_kernel(train, test, k, lamda=1):
+def knn(train, test, k, lamda):
     row_number = test.shape[0]
     predictions = np.zeros(row_number)
     for i in range(row_number):
@@ -84,50 +84,14 @@ def denormalize_y(column, map_for_normalization):
     return column
 
 
-def cross_validation(df, k=5):
-    normalizing_map = create_normalization_map(df)
-    df = normalize_dataframe(df, normalizing_map)
-    rmse_scores = []
-
-    # Set the random seed for reproducibility
-    np.random.seed(42)
-
-    # Shuffle the rows of the DataFrame
-    df_shuffled = df.sample(frac=1).reset_index(drop=True)
-
-    # Split the shuffled DataFrame into k parts
-    k = 5
-    df_parts = np.array_split(df_shuffled, k)
-
-    # Concatenate all parts except one into a single DataFrame
-    i = 0  # The index of the part to exclude
-
-    for i in range(k):
-        df_train = pandas.concat([df_parts[j] for j in range(k) if j != i])
-        df_test = pandas.concat([df_parts[i]])
-
-        # coef = ridge_regression(df_train, alpha=385)
-        y_test = df_test['price']
-
-        y_test_denormalized = denormalize_y(y_test, normalizing_map)
-        # y_calculated_denormalized = denormalize_y(predict(df, coef), normalizing_map)
-        # rmse_scores.append(rmse(y_test_denormalized, y_calculated_denormalized))
-
-        predictions = knn_kernel(df_train, df_test, 10, lamda=10)
-        predictions = denormalize_y(predictions, normalizing_map)
-        rmse_scores.append(rmse(y_test_denormalized, predictions))
-
-    mean_score = np.mean(rmse_scores)
-
-    print(mean_score)
-    print(rmse_scores)
-
-
 def add_missing_columns(test_data, column_names):
+    dataframe = pandas.DataFrame(columns=column_names)
     for name in column_names:
         if name not in test_data.columns:
-            test_data = pandas.concat([pandas.Series(np.zeros(test_data.shape[0])), test_data], axis=1)
-    return test_data.sort_index(axis=1, key=lambda x: pandas.Index(column_names).get_indexer(x))
+            dataframe[name] = pandas.Series(np.zeros(test_data.shape[0]))
+        else:
+            dataframe[name] = test_data[name]
+    return dataframe
 
 
 def preprocess_data(file_path, type='train'):
@@ -141,12 +105,12 @@ def preprocess_data(file_path, type='train'):
 
 if __name__ == '__main__':
     train_data = preprocess_data(sys.argv[1])
-    test_data = preprocess_data(sys.argv[2])
+    test_data = preprocess_data(sys.argv[2], type='test')
     expected_values = test_data['price']
     normalizing_map = create_normalization_map(train_data)
     train_data = normalize_dataframe(train_data, normalizing_map)
     test_data = normalize_dataframe(test_data, normalizing_map)
     test_data = add_missing_columns(test_data, train_data.columns)
-    predictions = knn_kernel(train_data, test_data, 5, lamda=3)
+    predictions = knn(train_data, test_data, 5, lamda=3)
     predictions = denormalize_y(predictions, normalizing_map)
     print(rmse(expected_values, predictions))
