@@ -1,0 +1,71 @@
+# izbaciti sve tacke i znake interpukncije
+# zavisi kakav smajli imamo
+
+
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+import string
+
+
+def transform_review_sentence(review):
+    review.translate(str.maketrans('', '', string.punctuation))
+    return review.lower()
+
+
+def transform_zeros(sentiment):
+    if sentiment == 0:
+        return -1
+    return sentiment
+
+
+def transform_dataset(dataset):
+    dataset['Review'] = dataset['Review'].apply(transform_review_sentence)
+    dataset['Sentiment'] = dataset['Sentiment'].apply(transform_zeros)
+
+
+def split_dataset_on_x_y(dataset):
+    return dataset.loc[:, 'Review'], dataset.loc[:, 'Sentiment']
+
+
+def linear_kernel():
+    clf = SVC(kernel='linear')
+    clf.fit(X_train, y_train)
+    # Evaluate the classifier on the testing data
+    y_pred = clf.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    print("Accuracy:", accuracy)
+    return accuracy
+
+
+def sigmoid_kernel():
+    clf = SVC(kernel='sigmoid', gamma='scale', coef0=0)
+    clf.fit(X_train, y_train)
+    # Evaluate the classifier on the testing data
+    y_pred = clf.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    print("Accuracy:", accuracy)
+    return accuracy
+
+
+if __name__ == '__main__':
+    # Load the dataset
+    train_data = pd.read_csv('train.tsv', sep='\t')
+    transform_dataset(train_data)
+    # test_data = pd.read_csv('test_preview.tsv', sep='\t')
+    # transform_dataset(test_data)
+    # X_test, y_test = split_dataset_on_x_y(test_data)
+    # X_train, y_train = split_dataset_on_x_y(train_data)
+
+    # Split the data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(train_data['Review'], train_data['Sentiment'], test_size=0.2)
+
+    # Convert the text reviews into numerical features using TF-IDF vectorization
+    vectorizer = TfidfVectorizer()
+    X_train = vectorizer.fit_transform(X_train)
+    X_test = vectorizer.transform(X_test)
+
+    # Train an SVM classifier on the training data
+    linear_kernel()
