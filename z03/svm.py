@@ -1,18 +1,41 @@
-# izbaciti sve tacke i znake interpukncije
-# zavisi kakav smajli imamo
-
+import string
 
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
-import string
 
 
 def transform_review_sentence(review):
     review.translate(str.maketrans('', '', string.punctuation))
     return review.lower()
+
+
+def replace_emojis(review):
+    if ':)' in review:
+        review = review.replace(":)", "dobro")
+    if ';)' in review:
+        review = review.replace(";)", "super")
+    if 'xD' in review:
+        review = review.replace("xD", "fantasticno")
+    if ':-)' in review:
+        review = review.replace(":-)", "dobro")
+    if ';D' in review:
+        review = review.replace(";D", "bez veze")
+    if ':(' in review:
+        review = review.replace(":(", "lose")
+    return review
+
+
+def remove_stop_words(review):
+    # TODO implement removing stop words
+    pass
+
+
+def remove_serbian_specific_letters(review):
+    # TODO implement replacing letters like ŠĐĆČŽ with s,dj,c,c,z
+    pass
 
 
 def transform_zeros(sentiment):
@@ -22,8 +45,13 @@ def transform_zeros(sentiment):
 
 
 def transform_dataset(dataset):
+    dataset['Review'] = dataset['Review'].apply(replace_emojis)
     dataset['Review'] = dataset['Review'].apply(transform_review_sentence)
+    # TODO uncomment when done
+    # dataset['Review'] = dataset['Review'].apply(remove_serbian_specific_letters)
+    # dataset['Review'] = dataset['Review'].apply(remove_stop_words)
     dataset['Sentiment'] = dataset['Sentiment'].apply(transform_zeros)
+    return dataset
 
 
 def split_dataset_on_x_y(dataset):
@@ -52,8 +80,9 @@ def sigmoid_kernel():
 
 if __name__ == '__main__':
     # Load the dataset
+
     train_data = pd.read_csv('train.tsv', sep='\t')
-    transform_dataset(train_data)
+    train_data = transform_dataset(train_data)
     # test_data = pd.read_csv('test_preview.tsv', sep='\t')
     # transform_dataset(test_data)
     # X_test, y_test = split_dataset_on_x_y(test_data)
