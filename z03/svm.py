@@ -1,6 +1,7 @@
 import string
 
 import pandas as pd
+import sklearn
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
@@ -63,17 +64,8 @@ def linear_kernel():
     clf.fit(X_train, y_train)
     # Evaluate the classifier on the testing data
     y_pred = clf.predict(X_test)
-    accuracy = accuracy_score(y_test, y_pred)
-    print("Accuracy:", accuracy)
-    return accuracy
-
-
-def sigmoid_kernel():
-    clf = SVC(kernel='sigmoid', gamma='scale', coef0=0)
-    clf.fit(X_train, y_train)
-    # Evaluate the classifier on the testing data
-    y_pred = clf.predict(X_test)
-    accuracy = accuracy_score(y_test, y_pred)
+    accuracy = sklearn.metrics.f1_score(y_test, y_pred, average='micro')
+    # accuracy = accuracy_score(y_test, y_pred)
     print("Accuracy:", accuracy)
     return accuracy
 
