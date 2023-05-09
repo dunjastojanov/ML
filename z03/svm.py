@@ -1,17 +1,9 @@
-import string
+import sys
 
 import pandas as pd
 import sklearn
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
-
-
-def transform_review_sentence(review):
-    review.translate(str.maketrans('', '', string.punctuation))
-    return review.lower()
-
 
 STOPWORDS = ['koja', 'tim', 'onakve', 'tome', 'onolikim', 'si', 'ovolikom', 'onakvim', 'nekog', 'gde', 'i', 'takvim',
              'onoliki', 'onakav', 'ovoliku', 'onakvu', 'ovakvim', 'kojeg', 'ovakvo', 'onolikom', 'neke', 'o',
@@ -56,25 +48,20 @@ EMOTICONS = {
 }
 
 
+def lowercase_review(review):
+    return review.lower()
+
+
 def remove_stop_words(review):
     return " ".join([word for word in review.split() if word not in STOPWORDS])
 
 
 def remove_punctuation(review):
-    return "".join([char for char in review if char not in string.punctuation])
+    return "".join([char for char in review if char not in """!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""])
 
 
 def replace_emoticons(review):
     return " ".join([EMOTICONS[word] if word in EMOTICONS.keys() else word for word in review.split()])
-
-
-def transform_dataset(dataset):
-    dataset['Review'] = dataset['Review'].apply(transform_review_sentence)
-    dataset['Review'] = dataset['Review'].apply(replace_emoticons)
-    dataset['Review'] = dataset['Review'].apply(remove_punctuation)
-    dataset['Review'] = dataset['Review'].apply(remove_stop_words)
-    dataset['Sentiment'] = dataset['Sentiment'].apply(transform_zeros)
-    return dataset
 
 
 def transform_zeros(sentiment):
@@ -83,38 +70,35 @@ def transform_zeros(sentiment):
     return sentiment
 
 
+def transform_dataset(dataset):
+    dataset['Review'] = dataset['Review'].apply(lowercase_review)
+    dataset['Review'] = dataset['Review'].apply(replace_emoticons)
+    dataset['Review'] = dataset['Review'].apply(remove_punctuation)
+    dataset['Review'] = dataset['Review'].apply(remove_stop_words)
+    dataset['Sentiment'] = dataset['Sentiment'].apply(transform_zeros)
+    return dataset
+
+
 def split_dataset_on_x_y(dataset):
     return dataset.loc[:, 'Review'], dataset.loc[:, 'Sentiment']
 
 
-def linear_kernel():
+def linear_kernel(x_train, y_train, x_test, y_test):
     clf = SVC(kernel='linear')
-    clf.fit(X_train, y_train)
-    # Evaluate the classifier on the testing data
-    y_pred = clf.predict(X_test)
+    clf.fit(x_train, y_train)
+    y_pred = clf.predict(x_test)
     accuracy = sklearn.metrics.f1_score(y_test, y_pred, average='micro')
-    # accuracy = accuracy_score(y_test, y_pred)
     print(accuracy)
-    return accuracy
 
 
 if __name__ == '__main__':
-    # Load the dataset
-
-    train_data = pd.read_csv('train.tsv', sep='\t')
+    train_data = pd.read_csv(sys.argv[1], sep='\t')
+    test_data = pd.read_csv(sys.argv[2], sep='\t')
     train_data = transform_dataset(train_data)
-    # test_data = pd.read_csv('test_preview.tsv', sep='\t')
-    # transform_dataset(test_data)
-    # X_test, y_test = split_dataset_on_x_y(test_data)
-    # X_train, y_train = split_dataset_on_x_y(train_data)
-
-    # Split the data into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(train_data['Review'], train_data['Sentiment'], test_size=0.2)
-
-    # Convert the text reviews into numerical features using TF-IDF vectorization
+    test_data = transform_dataset(test_data)
+    x_train, y_train = split_dataset_on_x_y(train_data)
+    x_test, y_test = split_dataset_on_x_y(test_data)
     vectorizer = TfidfVectorizer()
-    X_train = vectorizer.fit_transform(X_train)
-    X_test = vectorizer.transform(X_test)
-
-    # Train an SVM classifier on the training data
-    linear_kernel()
+    x_train = vectorizer.fit_transform(x_train)
+    x_test = vectorizer.transform(x_test)
+    linear_kernel(x_train, y_train, x_test, y_test)
