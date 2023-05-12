@@ -1,16 +1,15 @@
-import matplotlib.pyplot as plt
+import sys
+
+import numpy as np
 import pandas as pd
-import seaborn as sb
-from sklearn.ensemble import BaggingClassifier, AdaBoostClassifier, RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score
-from sklearn.model_selection import train_test_split
-from sklearn.tree import DecisionTreeClassifier
 
 minium_years = {
-    "osnovne studije": 20.0,
-    "master": 26.0,
-    "doktorat": 29.0,
-    "srednja skola": 16.0
+    "osnovne studije": 23.0,
+    "master": 28.0,
+    "doktorat": 31.0,
+    "srednja skola": 18.0
 }
 
 zdravstveno_osiguranje = {
@@ -42,13 +41,6 @@ def remove_outlier_by_age(data):
 
 def remove_outlier_where_y_is_nan(data):
     return data.drop(data[(data['obrazovanje'].isna())].index)
-
-
-def histogram(data, atr_name):
-    # zbog ovoga uzimamo mean za godine normalna raspodela
-    # zbog ovoga uzimamo medianu za plate -> nije normalna raspodela
-    sb.distplot(data[atr_name], bins=40, axlabel=atr_name)
-    plt.show()
 
 
 def create_normalization_map(dataframe):
@@ -103,25 +95,37 @@ def drop_column_with_name(data, name):
     return data
 
 
+def add_rows(dataframe, percentage=0.1):
+    for key in minium_years.keys():
+        filtered_df = dataframe[dataframe['obrazovanje'] == key]
+        new_row = {
+            'godine': filtered_df['godine'].median(),
+            'bracni_status': filtered_df['bracni_status'].mode()[0],
+            'rasa': filtered_df['rasa'].mode()[0],
+            'tip_posla': filtered_df['tip_posla'].mode()[0],
+            'zdravstveno_osiguranje': filtered_df['zdravstveno_osiguranje'].mode()[0],
+            'plata': filtered_df['plata'].median(),
+            'obrazovanje': key
+        }
+        stop = int(len(filtered_df) * percentage)
+        for i in range(stop):
+            dataframe.append(new_row, ignore_index=True)
+    return dataframe
+
+
 def preprocess_dataframe(data):
     data = remove_row_with_nan_atr(data)
     data = remove_outlier_where_y_is_nan(data)
     data = fill_in_age(data)
     data = remove_outlier_by_age(data)
     data = fill_in_salary(data)
-    # data = drop_column_with_name(data, 'tip_posla')
-    # data = drop_column_with_name(data, 'bracni_status')
-    # data = drop_column_with_name(data, 'zdravstveno_osiguranje')
-    # data = drop_column_with_name(data, 'rasa')
+    data = drop_column_with_name(data, 'bracni_status')
+    data = drop_column_with_name(data, 'zdravstveno_osiguranje')
     normalization_map = create_normalization_map(data)
     data = normalize_dataframe(data, normalization_map)
     fill_with_most_frequent(data, 'rasa')
-    fill_with_most_frequent(data, 'bracni_status')
     fill_with_most_frequent(data, 'tip_posla')
-    fill_with_most_frequent(data, 'zdravstveno_osiguranje')
     data = normalize_other_atr(data, 'tip_posla', tip_posla)
-    data = normalize_other_atr(data, 'zdravstveno_osiguranje', zdravstveno_osiguranje)
-    data = smarter_version_one_hot(data, 'bracni_status')
     data = smarter_version_one_hot(data, 'rasa')
     return data
 
@@ -135,65 +139,34 @@ def preprocess_test_dataframe(data, normalization_map):
     return data
 
 
-def correlation_matrix(data):
-    matrica_korelacije = data.corr()
-    plt.figure(figsize=(15, 15))
-    sb.heatmap(matrica_korelacije, cmap="Blues", annot=True)
-    plt.show()
-
-
-def bagging_algo(data):
-    X = data.drop(columns=['obrazovanje'])
-    y = data['obrazovanje']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    # Create a decision tree classifier
-    tree = DecisionTreeClassifier(random_state=42)
-    # Create a bagging ensemble of decision tree classifiers
-    bagging = BaggingClassifier(base_estimator=tree, n_estimators=10, random_state=42)
-    # Train the bagging ensemble on the training set
-    bagging.fit(X_train, y_train)
-    # Evaluate the performance of the bagging ensemble on the testing set
-    y_pred = bagging.predict(X_test)
-    score = f1_score(y_test, y_pred, average='macro')
-    print("Macro F1 score:", score)
-
-
-def boosting(data):
-    y = data['obrazovanje']
-    X = data.drop(columns=['obrazovanje'])
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    # Create a gradient boosting classifier object
-    gb_classifier = AdaBoostClassifier()
-
-    # Fit the model on the training data
-    gb_classifier.fit(X_train, y_train)
-    # Use the model to make predictions on the test data
-    y_pred = gb_classifier.predict(X_test)
-    # Calculate the macro f1 score
-    score = f1_score(y_test, y_pred, average='macro')
-    # Print the classification report and macro f1 score
-    print("Macro F1 score:", score)
-
-
-def random_forest(data):
-    y = data['obrazovanje']
-    X = data.drop(columns=['obrazovanje'])
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    # Create a random forest classifier object
+def random_forest(data, test):
+    x_train = data.drop(columns=['obrazovanje'])
+    y_train = data['obrazovanje']
+    x_test = test.drop(columns=['obrazovanje'])
+    y_test = test['obrazovanje']
     rf_classifier = RandomForestClassifier()
-    # Fit the model on the training data
-    rf_classifier.fit(X_train, y_train)
-    # Use the model to make predictions on the test data
-    y_pred = rf_classifier.predict(X_test)
-    # Calculate the macro f1 score
-    macro_f1 = f1_score(y_test, y_pred, average='macro')
-    # Print the classification report and macro f1 score
-    print("Macro F1 score:", macro_f1)
+    rf_classifier.fit(x_train, y_train)
+    y_pred = rf_classifier.predict(x_test)
+    score = f1_score(y_test, y_pred, average='macro')
+    print(score)
+
+
+def add_missing_columns(test, column_names):
+    dataframe = pd.DataFrame(columns=column_names)
+    for name in column_names:
+        if name not in test.columns:
+            dataframe[name] = pd.Series(np.zeros(test.shape[0]))
+        else:
+            dataframe[name] = test[name]
+    return dataframe
 
 
 if __name__ == '__main__':
-    train_data = load_file('train.csv')
+    train_data = load_file(sys.argv[1])
+    train_data = add_rows(train_data)
+    normalization_map = create_normalization_map(train_data)
     train_data = preprocess_dataframe(train_data)
-    bagging_algo(train_data)
-    boosting(train_data)
-    random_forest(train_data)
+    test_data = load_file(sys.argv[2])
+    test_data = preprocess_test_dataframe(test_data, normalization_map)
+    test_data = add_missing_columns(test_data, train_data.columns)
+    random_forest(train_data, test_data)
