@@ -2,8 +2,9 @@ import sys
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import AdaBoostClassifier
 from sklearn.metrics import f1_score
+from sklearn.tree import DecisionTreeClassifier
 
 minium_years = {
     "osnovne studije": 23.0,
@@ -95,24 +96,6 @@ def drop_column_with_name(data, name):
     return data
 
 
-def add_rows(dataframe, percentage=0.1):
-    for key in minium_years.keys():
-        filtered_df = dataframe[dataframe['obrazovanje'] == key]
-        new_row = {
-            'godine': filtered_df['godine'].median(),
-            'bracni_status': filtered_df['bracni_status'].mode()[0],
-            'rasa': filtered_df['rasa'].mode()[0],
-            'tip_posla': filtered_df['tip_posla'].mode()[0],
-            'zdravstveno_osiguranje': filtered_df['zdravstveno_osiguranje'].mode()[0],
-            'plata': filtered_df['plata'].median(),
-            'obrazovanje': key
-        }
-        stop = int(len(filtered_df) * percentage)
-        for i in range(stop):
-            dataframe.append(new_row, ignore_index=True)
-    return dataframe
-
-
 def preprocess_dataframe(data):
     data = remove_row_with_nan_atr(data)
     data = remove_outlier_where_y_is_nan(data)
@@ -133,20 +116,21 @@ def preprocess_dataframe(data):
 def preprocess_test_dataframe(data, normalization_map):
     data = normalize_dataframe(data, normalization_map)
     data = normalize_other_atr(data, 'tip_posla', tip_posla)
-    data = normalize_other_atr(data, 'zdravstveno_osiguranje', zdravstveno_osiguranje)
-    data = smarter_version_one_hot(data, 'bracni_status')
+    data = drop_column_with_name(data, 'bracni_status')
+    data = drop_column_with_name(data, 'zdravstveno_osiguranje')
     data = smarter_version_one_hot(data, 'rasa')
     return data
 
 
-def random_forest(data, test):
+def boosting_algo(data, test):
     x_train = data.drop(columns=['obrazovanje'])
     y_train = data['obrazovanje']
     x_test = test.drop(columns=['obrazovanje'])
     y_test = test['obrazovanje']
-    rf_classifier = RandomForestClassifier()
-    rf_classifier.fit(x_train, y_train)
-    y_pred = rf_classifier.predict(x_test)
+    tree = DecisionTreeClassifier(max_depth=7)
+    adaboost = AdaBoostClassifier(base_estimator=tree, n_estimators=100, random_state=42)
+    adaboost.fit(x_train, y_train)
+    y_pred = adaboost.predict(x_test)
     score = f1_score(y_test, y_pred, average='macro')
     print(score)
 
@@ -163,10 +147,9 @@ def add_missing_columns(test, column_names):
 
 if __name__ == '__main__':
     train_data = load_file(sys.argv[1])
-    train_data = add_rows(train_data)
     normalization_map = create_normalization_map(train_data)
     train_data = preprocess_dataframe(train_data)
     test_data = load_file(sys.argv[2])
     test_data = preprocess_test_dataframe(test_data, normalization_map)
     test_data = add_missing_columns(test_data, train_data.columns)
-    random_forest(train_data, test_data)
+    boosting_algo(train_data, test_data)
