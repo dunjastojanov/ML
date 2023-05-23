@@ -106,6 +106,10 @@ def preprocess_dataframe(data):
 
 
 def preprocess_test_dataframe(data, normalization_map):
+    data = drop_column_with_name(data, 'Inflacija')
+    data = normalize_other_atr(data, 'More', more)
+    data = smarter_version_one_hot(data, 'Religija')
+    data = normalize_dataframe(data, normalization_map)
     return data
 
 
@@ -123,7 +127,7 @@ def EM(train_data):
     num_clusters = 4
     y = train_data['Region']
     data = drop_column_with_name(train_data, 'Region')
-    X_train, X_test, y_train, y_test = train_test_split(data, y, test_size=0.3, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(data, y, test_size=0.3)
     gmm = GaussianMixture(n_components=num_clusters, covariance_type='spherical', init_params='kmeans', random_state=42)
     gmm.fit(X_train)
     predicted_clusters = gmm.predict(X_test)
@@ -142,11 +146,35 @@ def EM(train_data):
     print('diag ', v_measure_score(y_test, predicted_clusters))
 
 
+def gaussian(test_data, train_data):
+    num_clusters = 4
+    x_train = drop_column_with_name(train_data, 'Region')
+
+    y_test = test_data['Region']
+    x_test = drop_column_with_name(test_data, 'Region')
+
+    gmm = GaussianMixture(n_components=num_clusters, covariance_type='diag', init_params='kmeans', random_state=42)
+    gmm.fit(x_train)
+    predicted_clusters = gmm.predict(x_test)
+
+    print(v_measure_score(y_test, predicted_clusters))
+
+
 if __name__ == '__main__':
+
+
     train_data = load_file('train.csv')
     train_data = preprocess_dataframe(train_data)
+
+    test_data = load_file('test_preview.csv')
+    test_data = preprocess_test_dataframe(test_data, create_normalization_map(train_data))
+    test_data = add_missing_columns(test_data, train_data.columns)
+
+    # gaussian(test_data, train_data)
+
     # samo izvoz treba da namapiramo
     # print(train_data.info())
     # correlation_matrix(train_data)
     # print(train_data.cov())
+
     EM(train_data)
