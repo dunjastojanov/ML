@@ -35,14 +35,16 @@ def remove_outlier_where_y_is_nan(data):
 
 
 def fill_in_izvoz(data):
-    median_izvoz = data['Izvoz'].mean()
+    median_izvoz = data['Izvoz'].median()
     data['Izvoz'] = data['Izvoz'].fillna(median_izvoz)
     return data
+
 
 def fill_in_BDP(data):
     median_izvoz = data['BDP'].mean()
     data['BDP'] = data['BDP'].fillna(median_izvoz)
     return data
+
 
 def normalize_other_atr(data, atr_name, map):
     data[atr_name] = data[atr_name].map(map)
@@ -56,57 +58,22 @@ def smarter_version_one_hot(data, atr_name):
     return new_df
 
 
-def create_normalization_map(dataframe):
-    map = {}
-    for column in dataframe.columns:
-        if column in ['BDP', 'Inflacija', 'Izvoz']:
-            map[column] = {
-                'min': dataframe[column].min(),
-                'max': dataframe[column].max()
-            }
-    return map
-
-
-def normalize_dataframe(data, map_for_normalization):
-    for column in map_for_normalization.keys():
-        data[column] = (data[column] - map_for_normalization[column]["min"]) / (
-                map_for_normalization[column]["max"] - map_for_normalization[column]["min"])
-    return data
-
-
 def preprocess_dataframe(data):
-    data = remove_row_with_nan_atr(data, count_of_nan_atr=1)
+    data = remove_row_with_nan_atr(data, count_of_nan_atr=2)
+    data = remove_row_for_value(data, 'Izvoz', 125)
     data = fill_in_izvoz(data)
     data = fill_in_BDP(data)
+    data = remove_row_for_value(data, 'Inflacija', 500)
+    data = remove_row_for_value(data, 'BDP', 150000)
     data = normalize_other_atr(data, 'More', more)
     data = smarter_version_one_hot(data, 'Religija')
-    normalization_map = create_normalization_map(data)
-    data = normalize_dataframe(data, normalization_map)
     return data
 
 
-def preprocess_test_dataframe(data, normalization_map):
+def preprocess_test_dataframe(data):
     data = normalize_other_atr(data, 'More', more)
     data = smarter_version_one_hot(data, 'Religija')
-    data = normalize_dataframe(data, normalization_map)
     return data
-
-
-def gaussian(test_data, train_data):
-    num_clusters = 4
-    x_train = drop_column_with_name(train_data, 'Region')
-
-    y_test = test_data['Region']
-    x_test = drop_column_with_name(test_data, 'Region')
-
-    # tol parametar
-    # GridSearch
-
-    gmm = GaussianMixture(n_components=num_clusters, covariance_type='diag', init_params='kmeans', random_state=42)
-    gmm.fit(x_train)
-    predicted_clusters = gmm.predict(x_test)
-
-    print(v_measure_score(y_test, predicted_clusters))
 
 
 def add_missing_columns(test, column_names):
@@ -119,12 +86,26 @@ def add_missing_columns(test, column_names):
     return dataframe
 
 
+def gaussian(test_data, train_data):
+    num_clusters = 4
+    x_train = drop_column_with_name(train_data, 'Region')
+
+    y_test = test_data['Region']
+    x_test = drop_column_with_name(test_data, 'Region')
+
+    gmm = GaussianMixture(n_components=num_clusters, covariance_type='diag', init_params='kmeans', random_state=42)
+    gmm.fit(x_train)
+    predicted_clusters = gmm.predict(x_test)
+
+    print(v_measure_score(y_test, predicted_clusters))
+
+
 if __name__ == '__main__':
-    train_data = load_file(sys.argv[1])
+    # train_data = load_file(sys.argv[1])
+    train_data = load_file('train.csv')
     train_data = preprocess_dataframe(train_data)
-
-    test_data = load_file(sys.argv[2])
-    test_data = preprocess_test_dataframe(test_data, create_normalization_map(train_data))
+    test_data = load_file('test_preview.csv')
+    # test_data = load_file(sys.argv[2])
+    test_data = preprocess_test_dataframe(test_data)
     test_data = add_missing_columns(test_data, train_data.columns)
-
     gaussian(test_data, train_data)
