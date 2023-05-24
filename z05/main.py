@@ -28,6 +28,7 @@ def histogram(data, atr_name):
 
 def box_plot(data, atr_name):
     plt.boxplot(data[atr_name])
+    plt.title(atr_name)
     plt.show()
 
 
@@ -76,11 +77,14 @@ def drop_column_with_name(data, name):
 
 def preprocess_dataframe(data):
     data = remove_row_with_nan_atr(data, count_of_nan_atr=2)
+    data = fill_in_BDP(data)
+    data = fill_in_izvoz(data)
+    box_plot(data, 'Izvoz')
+    box_plot(data, 'Inflacija')
+    box_plot(data, 'BDP')
     data = remove_row_for_value(data, 'Izvoz', 125)
     data = remove_row_for_value(data, 'Inflacija', 500)
     data = remove_row_for_value(data, 'BDP', 150000)
-    data = fill_in_BDP(data)
-    data = fill_in_izvoz(data)
     data = normalize_other_atr(data, 'More', more)
     data = smarter_version_one_hot(data, 'Religija')
     return data
