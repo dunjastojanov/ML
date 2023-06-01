@@ -1,9 +1,10 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sb
 from sklearn.decomposition import PCA
-from sklearn.ensemble import AdaBoostClassifier
+from sklearn.ensemble import AdaBoostClassifier, RandomForestClassifier, GradientBoostingClassifier, VotingClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
@@ -105,6 +106,10 @@ def preprocess_dataframe(data):
 
 
 def preprocess_test_dataframe(data):
+    data = normalize_other_atr(data, 'jastuk', da_ne)
+    data = normalize_other_atr(data, 'pojas', da_ne)
+    data = normalize_other_atr(data, 'pol', pol)
+    data = normalize_other_atr(data, 'tip', tip)
     return data
 
 
@@ -134,12 +139,51 @@ def algo(train_data, test_data):
     y_pred = adaboost.predict(x_test)
     score = f1_score(y_test, y_pred, average='macro')
     print(score)
+def algo_with_test(train_data, test_data):
+    y_train = train_data['ishod']
+    train_data = drop_column_with_name(train_data, 'ishod')
+    pca = PCA(n_components=3)  # n_components=None za prikaz svega
+    pca.fit(train_data)
+    component = pca.transform(train_data)
+    # x_test = test_data.drop(columns=['obrazovanje'])
+    # y_test = test_data['obrazovanje']
+    x_train, x_test, y_train, y_test = train_test_split(component, y_train, test_size=0.2, random_state=42,
+                                                        stratify=y_train)
+    tree = DecisionTreeClassifier(max_depth=7)
+    adaboost = AdaBoostClassifier(base_estimator=tree, n_estimators=100, random_state=42)
+    adaboost.fit(x_train, y_train)
+    y_pred = adaboost.predict(x_test)
+    score = f1_score(y_test, y_pred, average='macro')
+    print(score)
+    random_forest = RandomForestClassifier(n_estimators=100, random_state=42)
+    random_forest.fit(x_train, y_train)
+    y_pred = random_forest.predict(x_test)
+    score = f1_score(y_test, y_pred, average='macro')
+    print(score)
+
+    gradient_boosting = GradientBoostingClassifier(n_estimators=100, random_state=42)
+    gradient_boosting.fit(x_train, y_train)
+    y_pred = gradient_boosting.predict(x_test)
+    score = f1_score(y_test, y_pred, average='macro')
+    print(score)
+
+    decision_tree = DecisionTreeClassifier(max_depth=7)
+    logistic_regression = LogisticRegression()
+    classifiers = [('dt', decision_tree), ('lr', logistic_regression)]
+    voting_classifier = VotingClassifier(classifiers)
+    voting_classifier.fit(x_train, y_train)
+    y_pred = voting_classifier.predict(x_test)
+    score = f1_score(y_test, y_pred, average='macro')
+    print(score)
 
 
 if __name__ == '__main__':
     train_data = pd.read_csv('train.csv')
+    test_data = pd.read_csv('test_preview.csv')
     train_data = preprocess_dataframe(train_data)
-    algo(train_data, train_data)
+    test_data = preprocess_test_dataframe(test_data)
+    # algo(train_data, train_data)
+    algo_with_test(train_data, test_data)
     # pca = PCA(n_components=3)  # n_components=None za prikaz svega
     # pca.fit(drop_column_with_name(train_data, 'ishod'))
     # plt.plot(np.cumsum(pca.explained_variance_ratio_))
